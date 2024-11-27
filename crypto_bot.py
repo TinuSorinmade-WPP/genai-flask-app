@@ -10,8 +10,7 @@ client = AzureOpenAI(
 )
 
 messages = [
-	{"role": "system", "content": "Respond to everything as a short poem"},
-	{"role": "user", "content": "Find me the price of the crypto that sounds like dog in buckaroos"}
+	{"role": "system", "content": "Respond to everything as a short poem"}
 ]
 
 def crypto_price(crypto_name, fiat_currency):
@@ -49,49 +48,60 @@ functions = [
 	}
 ]
 
-response = client.chat.completions.create(
-	model = "GPT-4",
-	messages = messages,
-	tools = functions,
-	# auto means chat-gpt decides when it needs to use external functions
-	tool_choice = "auto"
-)
-response_message = response.choices[0].message
-# if chat-gpt doesn't need help, this will be None, otherwise there will be stuff
-gpt_tools = response.choices[0].message.tool_calls
 
-# if gpt_tools is not None
-# gpt_tools is a list!
-if gpt_tools:
+def ask_question(user_question):
+		# building a conversation and saving every message from the user
+		messages.append({"role": "user", "content": user_question})
+		response = client.chat.completions.create(
+		model = "GPT-4",
+		messages = messages,
+		tools = functions,
+		# auto means chat-gpt decides when it needs to use external functions
+		tool_choice = "auto"
+	)
+		response_message = response.choices[0].message
+		# if chat-gpt doesn't need help, this will be None, otherwise there will be stuff
+		gpt_tools = response.choices[0].message.tool_calls
 
-	# set up a 'phonebook', if we see a function name, we need to tell our code 
-	# which function to call
-	available_functions = {
-		"get_crypto_price": crypto_price
-	}
+	# if gpt_tools is not None
+		# gpt_tools is a list!
+		if gpt_tools:
 
-	messages.append(response_message)
-	for gpt_tool in gpt_tools:
-		# figure out which friend to call
-		function_name = gpt_tool.function.name
-		# looking up my function name in my 'phonebook'
-		function_to_call = available_functions[function_name]
-		# need the parameters for the function
-		function_parameters = json.loads(gpt_tool.function.arguments)
-		function_response = function_to_call(function_parameters.get('crypto_name'), function_parameters.get('fiat_currency'))
-		messages.append(
-			{
-				"tool_call_id": gpt_tool.id,
-				"role": "tool",
-				"name": function_name,
-				"content": function_response
+			# set up a 'phonebook', if we see a function name, we need to tell our code 
+			# which function to call
+			available_functions = {
+				"get_crypto_price": crypto_price
 			}
-		)
-		second_response = client.chat.completions.create(
-			model = "GPT-4",
-			messages=messages
-		)
-		print(second_response.choices[0].message.content)
 
-else:
-	print(response.choices[0].message.content)
+			messages.append(response_message)
+			for gpt_tool in gpt_tools:
+				# figure out which friend to call
+				function_name = gpt_tool.function.name
+				# looking up my function name in my 'phonebook'
+				function_to_call = available_functions[function_name]
+				# need the parameters for the function
+				function_parameters = json.loads(gpt_tool.function.arguments)
+				function_response = function_to_call(function_parameters.get('crypto_name'), function_parameters.get('fiat_currency'))
+				messages.append(
+					{
+						"tool_call_id": gpt_tool.id,
+						"role": "tool",
+						"name": function_name,
+						"content": function_response
+					}
+				)
+				second_response = client.chat.completions.create(
+					model = "GPT-4",
+					messages=messages
+				)
+				#chatbot response if tools are used 
+				return second_response.choices[0].message.content
+
+		else:
+			#chatbot response if no external tools are used
+			return response.choices[0].message.content
+			
+		
+
+
+		
